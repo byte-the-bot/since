@@ -1,6 +1,6 @@
 # Package
 
-version = "0.1.0"
+version = "0.2.0"
 author = "Christine Dodrill"
 description = ".i le mi nundambysince"
 license = "0BSD"
@@ -9,27 +9,13 @@ binDir = "bin"
 bin = @["since"]
 
 let testFiles = @[
-  "base",
   "battlesnake",
   "pathing",
-  "redissave",
-  "redisurl",
-  "targeting",
 ]
 
 # Dependencies
 
-requires "nim >= 0.20.2", "jester", "redis",
-         "astar#head", "dotenv", "cligen", "nimbox"
-
-requires "https://github.com/Xe/waffle#head"
-
-task catlu, "ko zbasu la catlu":
-  withDir "src/sincePkg":
-    exec "nim --hints:off --verbosity:0 c -o:../../bin/catlu catlu"
-
-task setupremote, "set up dokku remote":
-  exec "git remote add dokku dokku@minipaas.xeserv.us:since"
+requires "nim >= 1.6.0", "jester >= 0.5.0", "astar >= 0.6.0"
 
 task test, "run tests":
   echo "running tests..."
@@ -37,5 +23,3 @@ task test, "run tests":
     for tf in testFiles:
       exec "nim c --hints:off --verbosity:0 -r " & tf
       rmFile tf.toExe
-
-const engineDownloadURL = "https://github.com/battlesnakeio/engine/releases/download/v0.2.23/engine_0.2.23_Linux_x86_64.tar.gz"
