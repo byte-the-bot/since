@@ -1,38 +1,34 @@
-import astar, asyncdispatch, dotenv,
-       jester, json, logging, os, random,
-       redis, strformat, strutils
+import asyncdispatch, jester, json, logging, os, random, strformat, strutils
 
 import sincePkg/[base, pathing, redissave]
 
-waitFor redissave.init getEnv "REDIS_URL"
-info "redis client initialized"
+const
+  apiVersion = "1"
+  author = "Xe"
+  snakeColor = "#FFD600"
+  headType = "beluga"
+  tailType = "skinny"
 
 settings:
-  bindAddr = getEnv "BIND_ADDR"
-  port = getEnv("PORT").parseInt.Port
+  bindAddr = getEnv("BIND_ADDR", "0.0.0.0")
+  port = getEnv("PORT", "8000").parseInt.Port
 
 routes:
   get "/":
-    let version = getEnv "GIT_REV"
-    resp fmt"""<p>Battlesnake documentation can be found at <a href="https://docs.battlesnake.io">https://docs.battlesnake.io</a>.</p><p>version: {version}"""
-
-  post "/ping":
-    resp "OK"
+    let info = %* {
+      "apiversion": apiVersion,
+      "author": author,
+      "color": snakeColor,
+      "head": headType,
+      "tail": tailType,
+      "version": getEnv("GIT_REV", "dev")
+    }
+    resp Http200, $info, "application/json"
 
   post "/start":
-    const
-      snakeColor = "#FFD600"
-      headType = "beluga"
-      tailType = "skinny"
-    let
-      state = request.body.parseJson.to(State)
-      ret = %* {
-        "color": snakeColor,
-        "headType": headType,
-        "tailType": tailType
-      }
+    let state = request.body.parseJson.to(State)
     info fmt"game {state.game.id}: starting"
-    resp Http200, $ret, "application/json"
+    resp Http200, "OK", "text/plain"
 
   post "/move":
     try:
@@ -44,8 +40,8 @@ routes:
         desc: string
         victim: string
 
-      if state.turn != 0:
-        lastInfo = (await getData(state.game.id, $(state.turn-1))).to(GameData)
+      if state.turn != 0 and hasTurn(state.game.id, $(state.turn - 1)):
+        lastInfo = getData(state.game.id, $(state.turn-1)).to(GameData)
         target = lastInfo.target
         desc = lastInfo.desc
         victim = lastInfo.victim
@@ -63,6 +59,7 @@ routes:
         for sn in state.board.snakes:
           if sn.id == victim:
             target = sn.head
+            found = true
             break
         if not found:
           let interm = state.findTarget
@@ -83,10 +80,8 @@ routes:
         target = state.board.randomSafeTile
         desc = "random-fallback"
         myPath = state.findPath(source, target)
-      var
-        myMove: string
 
-      info fmt"{myPath}"
+      var myMove: string
       if myPath.len >= 2:
         myMove = source -> myPath[1]
       else:
@@ -95,21 +90,15 @@ routes:
 
       info fmt"game {state.game.id} turn {state.turn}: moving {myMove} to get to {target}"
       debug fmt"path: {myPath}"
-      asyncCheck saveTurn(state, target, myMove, myPath, desc, victim)
+      saveTurn(state, target, myMove, myPath, desc, victim)
 
-      let ret = %* {
-        "move": myMove
-      }
-
+      let ret = %* { "move": myMove }
       resp Http200, $ret, "application/json"
     except:
       info fmt"{getCurrentException().name}: {getCurrentExceptionMsg()}"
       info "random move"
 
-      let ret = %* {
-        "move": sample ["up", "left", "right", "down"]
-      }
-
+      let ret = %* { "move": sample ["up", "left", "right", "down"] }
       resp Http200, $ret, "application/json"
 
   post "/end":
@@ -119,11 +108,12 @@ routes:
                 state.board.snakes[0].id == state.you.id
 
     info fmt"game {state.game.id} turn {state.turn}: win: {didIWin}"
+    dropGame(state.game.id)
 
-    resp "OK"
+    resp Http200, "OK", "text/plain"
 
   get "/inspect/@gameId":
-    resp Http200, pretty await getGame(@"gameId"), "application/json"
+    resp Http200, pretty getGame(@"gameId"), "application/json"
 
   get "/inspect/@gameId/@turn":
-    resp Http200, pretty await getData(@"gameId", @"turn"), "application/json"
+    resp Http200, pretty getData(@"gameId", @"turn"), "application/json"

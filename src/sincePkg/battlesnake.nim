@@ -44,14 +44,17 @@ func hash*(p: CoordinatePair): Hash =
   h = h !& hash(p.y)
   result = !$h
 
+# v1 Battlesnake API uses a bottom-left origin: (0, 0) is the bottom-left
+# corner. +y is up, -y is down. The original v0 code used a top-left origin
+# (the opposite convention), so the up/down branches are swapped here.
 func `->`*(l, r: CoordinatePair): string =
   if l.x < r.x:
     return "right"
   if l.x > r.x:
     return "left"
-  if l.y > r.y:
-    return "up"
   if l.y < r.y:
+    return "up"
+  if l.y > r.y:
     return "down"
 
   assert(false)
@@ -87,8 +90,7 @@ proc isDeadly*(b: Board, p: CoordinatePair): bool =
     for seg in enemy.body:
       if seg == p:
         return true
-
-      return false
+  return false
 
 proc isDangerous*(s: State, p: CoordinatePair): bool =
   for loc in s.allNeighbors p:
@@ -103,16 +105,16 @@ when isMainModule:
 
   suite "coordinates":
     test "equality":
-      assert newCP(1, 1) == newCP(1, 1)
+      check newCP(1, 1) == newCP(1, 1)
     test "toString":
-      assert $newCP(1, 1) == "(1, 1)"
-    test "directionality":
+      check $newCP(1, 1) == "(1, 1)"
+    test "directionality (v1 bottom-left origin)":
       type Case = tuple[a, b: CoordinatePair, s: string]
       let pairs: seq[Case] = @[
         (newCP(1, 1), newCP(2, 1), "right"),
         (newCP(1, 1), newCP(0, 1), "left"),
-        (newCP(1, 1), newCP(1, 0), "up"),
-        (newCP(1, 1), newCP(1, 2), "down")
+        (newCP(1, 1), newCP(1, 2), "up"),
+        (newCP(1, 1), newCP(1, 0), "down")
       ]
 
       for p in pairs:
